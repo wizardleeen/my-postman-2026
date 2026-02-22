@@ -1,5 +1,5 @@
 import React from 'react'
-import { Clock, Trash2 } from 'lucide-react'
+import { Clock, Trash2, Globe } from 'lucide-react'
 import { HistoryItem } from '../types'
 
 interface SidebarProps {
@@ -26,8 +26,50 @@ const Sidebar: React.FC<SidebarProps> = ({ history, onHistoryClick, onClearHisto
     }
   }
 
+  const exampleApis = [
+    { name: 'JSONPlaceholder Posts', url: 'https://jsonplaceholder.typicode.com/posts', method: 'GET' },
+    { name: 'JSONPlaceholder Users', url: 'https://jsonplaceholder.typicode.com/users', method: 'GET' },
+    { name: 'HTTPBin GET', url: 'https://httpbin.org/get', method: 'GET' },
+    { name: 'HTTPBin POST', url: 'https://httpbin.org/post', method: 'POST' },
+    { name: 'Cat Facts API', url: 'https://catfact.ninja/fact', method: 'GET' },
+    { name: 'REST Countries', url: 'https://restcountries.com/v3.1/name/china', method: 'GET' }
+  ]
+
+  const handleExampleClick = (example: { name: string, url: string, method: string }) => {
+    onHistoryClick({
+      id: Date.now().toString(),
+      method: example.method,
+      url: example.url,
+      timestamp: new Date().toISOString(),
+      status: 0
+    })
+  }
+
   return (
     <div className="sidebar">
+      <div style={{ marginBottom: '30px' }}>
+        <h2>
+          <Globe size={18} style={{ marginRight: '8px', verticalAlign: 'middle' }} />
+          Example APIs
+        </h2>
+        <div className="api-examples">
+          <h3>Try these CORS-enabled APIs:</h3>
+          {exampleApis.map((example, index) => (
+            <div
+              key={index}
+              className="example-item"
+              onClick={() => handleExampleClick(example)}
+              title={`Click to load ${example.name}`}
+            >
+              <span className={getMethodClass(example.method)}>
+                {example.method}
+              </span>
+              {example.name}
+            </div>
+          ))}
+        </div>
+      </div>
+      
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
         <h2>
           <Clock size={18} style={{ marginRight: '8px', verticalAlign: 'middle' }} />
@@ -67,8 +109,8 @@ const Sidebar: React.FC<SidebarProps> = ({ history, onHistoryClick, onClearHisto
                 <span className={getMethodClass(item.method)}>
                   {item.method}
                 </span>
-                <span className={item.status >= 400 ? 'status-error' : 'status-success'}>
-                  {item.status}
+                <span className={item.status >= 400 ? 'status-error' : item.status >= 200 ? 'status-success' : ''}>
+                  {item.status || 'Pending'}
                 </span>
               </div>
               <div style={{ fontSize: '12px', opacity: 0.8, marginBottom: '3px' }}>
