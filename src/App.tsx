@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Send, Clock, AlertCircle } from 'lucide-react'
+import { AlertCircle } from 'lucide-react'
 import RequestPanel from './components/RequestPanel'
 import ResponsePanel from './components/ResponsePanel'
 import Sidebar from './components/Sidebar'
@@ -22,7 +22,11 @@ const App: React.FC = () => {
   useEffect(() => {
     const savedHistory = localStorage.getItem('http-client-history')
     if (savedHistory) {
-      setHistory(JSON.parse(savedHistory))
+      try {
+        setHistory(JSON.parse(savedHistory))
+      } catch {
+        // Ignore invalid JSON
+      }
     }
   }, [])
 
@@ -43,9 +47,7 @@ const App: React.FC = () => {
 
     try {
       // Prepare headers object
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json' // Default content type
-      }
+      const headers: Record<string, string> = {}
       
       currentRequest.headers.forEach(header => {
         if (header.key.trim() && header.value.trim()) {
@@ -53,13 +55,20 @@ const App: React.FC = () => {
         }
       })
 
+      // Set default content type for POST/PUT/PATCH if not specified
+      if (['POST', 'PUT', 'PATCH'].includes(currentRequest.method) && 
+          !Object.keys(headers).some(key => key.toLowerCase() === 'content-type') &&
+          currentRequest.body.trim()) {
+        headers['Content-Type'] = 'application/json'
+      }
+
       const startTime = Date.now()
       
       // Prepare fetch options
       const fetchOptions: RequestInit = {
         method: currentRequest.method,
         headers,
-        mode: 'cors' // Enable CORS
+        mode: 'cors'
       }
 
       // Add body for methods that support it
@@ -86,7 +95,7 @@ const App: React.FC = () => {
         } else {
           responseBody = await fetchResponse.text()
         }
-      } catch (e) {
+      } catch {
         responseBody = 'Failed to parse response body'
       }
 
@@ -123,7 +132,7 @@ const App: React.FC = () => {
         status: 0,
         statusText: 'Request Failed',
         headers: {},
-        body: `Error: ${error}`,
+        body: `Error: ${error instanceof Error ? error.message : String(error)}`,
         responseTime: 0
       })
     } finally {
@@ -132,7 +141,6 @@ const App: React.FC = () => {
   }
 
   const handleHistoryClick = (item: HistoryItem) => {
-    // Find the full request from history if available, or create a basic one
     setCurrentRequest({
       method: item.method,
       url: item.url,

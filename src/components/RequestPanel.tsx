@@ -41,6 +41,7 @@ const RequestPanel: React.FC<RequestPanelProps> = ({ request, onChange, onSend, 
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault()
       onSend()
     }
   }
@@ -68,7 +69,7 @@ const RequestPanel: React.FC<RequestPanelProps> = ({ request, onChange, onSend, 
           placeholder="Enter request URL..."
           value={request.url}
           onChange={(e) => handleUrlChange(e.target.value)}
-          onKeyPress={handleKeyPress}
+          onKeyDown={handleKeyPress}
         />
         
         <button 
