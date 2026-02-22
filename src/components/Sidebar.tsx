@@ -1,14 +1,15 @@
 import React from 'react'
-import { Clock, Trash2, Globe } from 'lucide-react'
+import { Clock, Trash2, Monitor, Globe } from 'lucide-react'
 import { HistoryItem } from '../types'
 
 interface SidebarProps {
   history: HistoryItem[]
   onHistoryClick: (item: HistoryItem) => void
   onClearHistory: () => void
+  isElectron?: boolean
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ history, onHistoryClick, onClearHistory }) => {
+const Sidebar: React.FC<SidebarProps> = ({ history, onHistoryClick, onClearHistory, isElectron }) => {
   const formatTime = (timestamp: string) => {
     return new Date(timestamp).toLocaleTimeString()
   }
@@ -32,7 +33,8 @@ const Sidebar: React.FC<SidebarProps> = ({ history, onHistoryClick, onClearHisto
     { name: 'HTTPBin GET', url: 'https://httpbin.org/get', method: 'GET' },
     { name: 'HTTPBin POST', url: 'https://httpbin.org/post', method: 'POST' },
     { name: 'Cat Facts API', url: 'https://catfact.ninja/fact', method: 'GET' },
-    { name: 'REST Countries', url: 'https://restcountries.com/v3.1/name/china', method: 'GET' }
+    { name: 'REST Countries', url: 'https://restcountries.com/v3.1/name/china', method: 'GET' },
+    { name: 'GitHub API', url: 'https://api.github.com/users/octocat', method: 'GET' }
   ]
 
   const handleExampleClick = (example: { name: string, url: string, method: string }) => {
@@ -47,55 +49,147 @@ const Sidebar: React.FC<SidebarProps> = ({ history, onHistoryClick, onClearHisto
 
   return (
     <div className="sidebar">
+      {/* 应用信息 */}
+      <div style={{ marginBottom: '25px' }}>
+        <h1 style={{ 
+          fontSize: '20px', 
+          fontWeight: '700', 
+          color: '#ecf0f1',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <Monitor size={20} />
+          My Postman 2026
+          {isElectron && (
+            <span className="electron-badge">Desktop</span>
+          )}
+        </h1>
+        <p style={{ 
+          fontSize: '13px', 
+          color: '#bdc3c7', 
+          marginTop: '5px',
+          fontWeight: '400'
+        }}>
+          {isElectron ? 'Desktop HTTP Client' : 'Web HTTP Client'}
+        </p>
+      </div>
+
+      {/* 示例API */}
       <div style={{ marginBottom: '30px' }}>
         <h2>
-          <Globe size={18} style={{ marginRight: '8px', verticalAlign: 'middle' }} />
+          <Globe size={18} />
           Example APIs
         </h2>
-        <div className="api-examples">
-          <h3>Try these CORS-enabled APIs:</h3>
+        <div style={{
+          background: 'rgba(52, 152, 219, 0.1)',
+          borderRadius: '8px',
+          padding: '15px',
+          marginTop: '10px',
+          border: '1px solid rgba(52, 152, 219, 0.2)'
+        }}>
+          <p style={{ 
+            fontSize: '12px', 
+            color: '#ecf0f1', 
+            marginBottom: '12px',
+            fontWeight: '500'
+          }}>
+            Click to try these APIs:
+          </p>
           {exampleApis.map((example, index) => (
             <div
               key={index}
-              className="example-item"
+              style={{
+                padding: '8px 10px',
+                margin: '5px 0',
+                background: 'rgba(255, 255, 255, 0.05)',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                fontSize: '12px',
+                border: '1px solid rgba(255, 255, 255, 0.1)'
+              }}
               onClick={() => handleExampleClick(example)}
-              title={`Click to load ${example.name}`}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'
+                e.currentTarget.style.transform = 'translateY(-1px)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
+                e.currentTarget.style.transform = 'translateY(0)'
+              }}
+              title={`${example.method} ${example.url}`}
             >
               <span className={getMethodClass(example.method)}>
                 {example.method}
               </span>
-              {example.name}
+              <span style={{ color: '#ecf0f1', fontSize: '11px' }}>
+                {example.name}
+              </span>
             </div>
           ))}
         </div>
       </div>
       
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+      {/* 请求历史 */}
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'space-between', 
+        marginBottom: '15px' 
+      }}>
         <h2>
-          <Clock size={18} style={{ marginRight: '8px', verticalAlign: 'middle' }} />
+          <Clock size={18} />
           Request History
+          {history.length > 0 && (
+            <span style={{ 
+              color: '#bdc3c7', 
+              fontSize: '12px', 
+              fontWeight: '400', 
+              marginLeft: '8px' 
+            }}>
+              ({history.length})
+            </span>
+          )}
         </h2>
         {history.length > 0 && (
           <button 
             onClick={onClearHistory}
             style={{ 
-              background: 'none', 
-              border: 'none', 
-              color: '#ecf0f1', 
+              background: 'rgba(231, 76, 60, 0.2)', 
+              border: '1px solid rgba(231, 76, 60, 0.3)',
+              borderRadius: '6px',
+              color: '#e74c3c', 
               cursor: 'pointer',
-              padding: '5px'
+              padding: '6px 8px',
+              transition: 'all 0.2s ease'
             }}
-            title="Clear history"
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(231, 76, 60, 0.3)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(231, 76, 60, 0.2)'
+            }}
+            title="Clear all history"
           >
-            <Trash2 size={16} />
+            <Trash2 size={14} />
           </button>
         )}
       </div>
       
       <ul className="history-list">
         {history.length === 0 ? (
-          <li style={{ color: '#bdc3c7', fontStyle: 'italic', padding: '10px 0' }}>
-            No requests yet
+          <li style={{ 
+            color: '#bdc3c7', 
+            fontStyle: 'italic', 
+            padding: '20px 10px',
+            textAlign: 'center',
+            fontSize: '13px'
+          }}>
+            No requests yet.<br />
+            <span style={{ fontSize: '12px', opacity: 0.7 }}>
+              Try the example APIs above!
+            </span>
           </li>
         ) : (
           history.map((item) => (
@@ -103,20 +197,34 @@ const Sidebar: React.FC<SidebarProps> = ({ history, onHistoryClick, onClearHisto
               key={item.id}
               className="history-item"
               onClick={() => onHistoryClick(item)}
-              title={item.url}
+              title={`${item.method} ${item.url}`}
             >
-              <div style={{ marginBottom: '5px' }}>
+              <div style={{ marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span className={getMethodClass(item.method)}>
                   {item.method}
                 </span>
-                <span className={item.status >= 400 ? 'status-error' : item.status >= 200 ? 'status-success' : ''}>
+                <span className={
+                  item.status >= 400 ? 'status-error' : 
+                  item.status >= 200 ? 'status-success' : 
+                  'status-pending'
+                } style={{ fontSize: '12px', fontWeight: '500' }}>
                   {item.status || 'Pending'}
                 </span>
               </div>
-              <div style={{ fontSize: '12px', opacity: 0.8, marginBottom: '3px' }}>
+              <div style={{ 
+                fontSize: '12px', 
+                opacity: 0.8, 
+                marginBottom: '4px',
+                wordBreak: 'break-all',
+                lineHeight: '1.3'
+              }}>
                 {formatUrl(item.url)}
               </div>
-              <div style={{ fontSize: '11px', opacity: 0.6 }}>
+              <div style={{ 
+                fontSize: '11px', 
+                opacity: 0.6,
+                color: '#bdc3c7'
+              }}>
                 {formatTime(item.timestamp)}
               </div>
             </li>
