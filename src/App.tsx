@@ -5,6 +5,9 @@ import ResponsePanel from './components/ResponsePanel'
 import Sidebar from './components/Sidebar'
 import { Request, Response, HistoryItem } from './types'
 
+// 检查是否在 Electron 环境中
+const isElectron = typeof window !== 'undefined' && window.electronAPI
+
 const App: React.FC = () => {
   const [currentRequest, setCurrentRequest] = useState<Request>({
     method: 'GET',
@@ -16,100 +19,123 @@ const App: React.FC = () => {
   const [response, setResponse] = useState<Response | null>(null)
   const [loading, setLoading] = useState(false)
   const [history, setHistory] = useState<HistoryItem[]>([])
-  const [corsError, setCorsError] = useState(false)
+  const [error, setError] = useState<string>('')
 
-  // Load history from localStorage on component mount
+  // 加载历史记录
   useEffect(() => {
-    const savedHistory = localStorage.getItem('http-client-history')
+    const savedHistory = localStorage.getItem('postman-history')
     if (savedHistory) {
       try {
         setHistory(JSON.parse(savedHistory))
-      } catch {
-        // Ignore invalid JSON
+      } catch (e) {
+        console.error('Failed to parse history:', e)
       }
     }
   }, [])
 
-  // Save history to localStorage whenever it changes
+  // 保存历史记录
   useEffect(() => {
-    localStorage.setItem('http-client-history', JSON.stringify(history))
+    localStorage.setItem('postman-history', JSON.stringify(history))
   }, [history])
+
+  // 监听 Electron 新请求事件
+  useEffect(() => {
+    if (isElectron && window.electronAPI) {
+      const handleNewRequest = () => {
+        setCurrentRequest({
+          method: 'GET',
+          url: '',
+          headers: [{ key: '', value: '' }],
+          body: ''
+        })
+        setResponse(null)
+        setError('')
+      }
+
+      window.electronAPI.onNewRequest(handleNewRequest)
+      
+      return () => {
+        window.electronAPI.removeAllListeners('new-request')
+      }
+    }
+  }, [])
 
   const handleSendRequest = async () => {
     if (!currentRequest.url.trim()) {
-      alert('Please enter a URL')
+      setError('Please enter a URL')
       return
     }
 
     setLoading(true)
     setResponse(null)
-    setCorsError(false)
+    setError('')
 
     try {
-      // Prepare headers object
+      // 准备请求头
       const headers: Record<string, string> = {}
-      
       currentRequest.headers.forEach(header => {
         if (header.key.trim() && header.value.trim()) {
           headers[header.key.trim()] = header.value.trim()
         }
       })
 
-      // Set default content type for POST/PUT/PATCH if not specified
-      if (['POST', 'PUT', 'PATCH'].includes(currentRequest.method) && 
-          !Object.keys(headers).some(key => key.toLowerCase() === 'content-type') &&
-          currentRequest.body.trim()) {
-        headers['Content-Type'] = 'application/json'
-      }
+      let responseData: Response
 
-      const startTime = Date.now()
-      
-      // Prepare fetch options
-      const fetchOptions: RequestInit = {
-        method: currentRequest.method,
-        headers,
-        mode: 'cors'
-      }
-
-      // Add body for methods that support it
-      if (['POST', 'PUT', 'PATCH'].includes(currentRequest.method) && currentRequest.body.trim()) {
-        fetchOptions.body = currentRequest.body
-      }
-
-      const fetchResponse = await fetch(currentRequest.url, fetchOptions)
-      const endTime = Date.now()
-      
-      // Get response headers
-      const responseHeaders: Record<string, string> = {}
-      fetchResponse.headers.forEach((value, key) => {
-        responseHeaders[key] = value
-      })
-
-      // Get response body
-      let responseBody = ''
-      try {
-        const contentType = fetchResponse.headers.get('content-type')
-        if (contentType && contentType.includes('application/json')) {
-          const jsonData = await fetchResponse.json()
-          responseBody = JSON.stringify(jsonData, null, 2)
-        } else {
-          responseBody = await fetchResponse.text()
+      if (isElectron && window.electronAPI) {
+        // Electron 环境：使用主进程的 HTTP 客户端
+        responseData = await window.electronAPI.makeHttpRequest({
+          method: currentRequest.method,
+          url: currentRequest.url,
+          headers: headers,
+          body: currentRequest.body || null
+        })
+      } else {
+        // Web 环境：使用 fetch（备用）
+        const startTime = Date.now()
+        
+        const fetchOptions: RequestInit = {
+          method: currentRequest.method,
+          headers: headers,
+          mode: 'cors'
         }
-      } catch {
-        responseBody = 'Failed to parse response body'
-      }
 
-      const responseData: Response = {
-        status: fetchResponse.status,
-        statusText: fetchResponse.statusText,
-        headers: responseHeaders,
-        body: responseBody,
-        responseTime: endTime - startTime
+        if (['POST', 'PUT', 'PATCH'].includes(currentRequest.method) && currentRequest.body.trim()) {
+          fetchOptions.body = currentRequest.body
+        }
+
+        const fetchResponse = await fetch(currentRequest.url, fetchOptions)
+        const endTime = Date.now()
+        
+        const responseHeaders: Record<string, string> = {}
+        fetchResponse.headers.forEach((value, key) => {
+          responseHeaders[key] = value
+        })
+
+        let responseBody = ''
+        try {
+          const contentType = fetchResponse.headers.get('content-type')
+          if (contentType && contentType.includes('application/json')) {
+            const jsonData = await fetchResponse.json()
+            responseBody = JSON.stringify(jsonData, null, 2)
+          } else {
+            responseBody = await fetchResponse.text()
+          }
+        } catch {
+          responseBody = 'Failed to parse response body'
+        }
+
+        responseData = {
+          status: fetchResponse.status,
+          statusText: fetchResponse.statusText,
+          headers: responseHeaders,
+          body: responseBody,
+          responseTime: endTime - startTime
+        }
       }
 
       setResponse(responseData)
 
-      // Add to history
+      // 添加到历史记录
       const historyItem: HistoryItem = {
         id: Date.now().toString(),
         method: currentRequest.method,
@@ -118,21 +144,18 @@ const App: React.FC = () => {
         status: responseData.status
       }
 
-      setHistory(prev => [historyItem, ...prev.slice(0, 49)]) // Keep last 50 items
+      setHistory(prev => [historyItem, ...prev.slice(0, 99)]) // 保留最近 100 条
 
-    } catch (error) {
-      console.error('Request failed:', error)
-      
-      // Check if it's a CORS error
-      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
-        setCorsError(true)
-      }
+    } catch (err) {
+      console.error('Request failed:', err)
+      const errorMessage = err instanceof Error ? err.message : String(err)
+      setError(errorMessage)
       
       setResponse({
         status: 0,
         statusText: 'Request Failed',
         headers: {},
-        body: `Error: ${error instanceof Error ? error.message : String(error)}`,
+        body: `Error: ${errorMessage}`,
         responseTime: 0
       })
     } finally {
@@ -148,7 +171,7 @@ const App: React.FC = () => {
       body: ''
     })
     setResponse(null)
-    setCorsError(false)
+    setError('')
   }
 
   const clearHistory = () => {
@@ -161,16 +184,23 @@ const App: React.FC = () => {
         history={history} 
         onHistoryClick={handleHistoryClick}
         onClearHistory={clearHistory}
+        isElectron={isElectron}
       />
       
       <div className="main-content">
-        {corsError && (
-          <div className="cors-warning">
+        {!isElectron && (
+          <div className="web-notice">
             <AlertCircle size={16} />
             <span>
-              CORS Error: The target server doesn't allow requests from this domain. 
-              Try using a CORS proxy or test with APIs that support CORS.
+              Running in web mode. For the best experience, download the desktop app.
             </span>
+          </div>
+        )}
+        
+        {error && (
+          <div className="error-banner">
+            <AlertCircle size={16} />
+            <span>{error}</span>
           </div>
         )}
         
